@@ -66,6 +66,13 @@ pub enum Command {
         pr: u64,
     },
 
+    /// Install (or uninstall) the crow Claude Code plugin
+    InstallPlugin {
+        /// Remove the plugin instead of installing
+        #[arg(long)]
+        uninstall: bool,
+    },
+
     /// Post a review on a PR
     Comment {
         /// PR number

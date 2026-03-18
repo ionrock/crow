@@ -33,6 +33,7 @@ fn run(cli: Cli) -> anyhow::Result<()> {
         Command::Push { reply } => cmd::push::run(reply),
         Command::Done { ready } => cmd::done::run(ready),
         Command::Review { pr } => cmd::review::run(pr),
+        Command::InstallPlugin { uninstall } => cmd::install_plugin::run(uninstall),
         Command::Comment { pr, event, body } => cmd::comment::run(pr, event, body),
     }
 }

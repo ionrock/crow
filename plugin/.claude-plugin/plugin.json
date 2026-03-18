@@ -1,0 +1,10 @@
+{
+  "name": "crow",
+  "description": "Code Review Workflow Accelerator — streamline GitHub PR reviews within Claude Code",
+  "version": "0.1.0",
+  "author": {
+    "name": "ionrock",
+    "url": "https://github.com/ionrock/crow"
+  },
+  "repository": "https://github.com/ionrock/crow"
+}

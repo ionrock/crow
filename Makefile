@@ -1,4 +1,4 @@
-.PHONY: build release install test lint fmt check clean
+.PHONY: build release install install-plugin uninstall-plugin test lint fmt check clean
 
 build:
 	cargo build
@@ -8,6 +8,12 @@ release:
 
 install: release
 	cargo install --path .
+
+install-plugin: install
+	crow install-plugin
+
+uninstall-plugin:
+	crow install-plugin --uninstall
 
 test:
 	cargo test
