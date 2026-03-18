@@ -23,7 +23,8 @@ pub fn run(pr: u64) -> Result<()> {
     );
 
     // Exec into worktree with claude session — does not return on success
-    wt::checkout_pr_exec(pr, "claude", &[&prompt]).context("Failed to launch review session")
+    wt::checkout_pr_exec(pr, "claude", &["--dangerously-skip-permissions", &prompt])
+        .context("Failed to launch review session")
 }
 
 fn build_prompt(
