@@ -1,13 +1,11 @@
 // gh.rs — adapter for all `gh` CLI and GraphQL calls
 
-#![allow(dead_code)]
-
 use anyhow::{Context, Result};
 use serde::de::DeserializeOwned;
 use serde::Deserialize;
 use std::process::Command;
 
-use crate::types::{CheckRun, Pr, RepoInfo, ReviewThread, ThreadComment, ThreadComments};
+use crate::types::{CheckRun, Pr, PrDetail, RepoInfo, ReviewThread, ThreadComment, ThreadComments};
 
 // ---------------------------------------------------------------------------
 // Internal helpers
@@ -318,6 +316,28 @@ pub fn post_review(pr: u64, event: &str, body: &str) -> Result<()> {
     run_gh(&["pr", "review", &pr_str, &event_flag, "--body", body])
         .context("Failed to post review")?;
     Ok(())
+}
+
+// ---------------------------------------------------------------------------
+// PR description and diff for review context
+// ---------------------------------------------------------------------------
+
+pub fn pr_view(pr: u64) -> Result<PrDetail> {
+    let pr_str = pr.to_string();
+    gh_json(&[
+        "pr",
+        "view",
+        &pr_str,
+        "--json",
+        "number,title,body,headRefName,baseRefName,author,url,files",
+    ])
+    .context("Failed to fetch PR details")
+}
+
+pub fn pr_diff(pr: u64) -> Result<String> {
+    let pr_str = pr.to_string();
+    let bytes = run_gh(&["pr", "diff", &pr_str]).context("Failed to fetch PR diff")?;
+    String::from_utf8(bytes).context("PR diff is not valid UTF-8")
 }
 
 // ---------------------------------------------------------------------------

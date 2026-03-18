@@ -1,7 +1,6 @@
-#![allow(dead_code)]
-
 use serde::Deserialize;
 
+#[allow(dead_code)]
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct Pr {
@@ -14,6 +13,7 @@ pub struct Pr {
     pub author: Option<Author>,
 }
 
+#[allow(dead_code)]
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct ReviewThread {
@@ -31,6 +31,7 @@ pub struct ThreadComments {
     pub nodes: Vec<ThreadComment>,
 }
 
+#[allow(dead_code)]
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct ThreadComment {
@@ -42,6 +43,7 @@ pub struct ThreadComment {
     pub diff_hunk: String,
 }
 
+#[allow(dead_code)]
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct CheckRun {
@@ -79,4 +81,27 @@ impl RepoInfo {
 #[derive(Debug, Deserialize)]
 pub struct OwnerInfo {
     pub login: String,
+}
+
+#[allow(dead_code)]
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct PrDetail {
+    pub number: u64,
+    pub title: String,
+    pub body: String,
+    pub head_ref_name: String,
+    pub base_ref_name: String,
+    pub author: Author,
+    pub url: String,
+    pub files: Vec<PrFile>,
+}
+
+#[allow(dead_code)]
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct PrFile {
+    pub path: String,
+    pub additions: u64,
+    pub deletions: u64,
 }

@@ -60,6 +60,12 @@ pub enum Command {
         ready: bool,
     },
 
+    /// Review a PR with Claude in a worktree
+    Review {
+        /// PR number to review
+        pr: u64,
+    },
+
     /// Post a review on a PR
     Comment {
         /// PR number
