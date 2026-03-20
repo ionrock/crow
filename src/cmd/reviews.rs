@@ -3,16 +3,22 @@ use std::collections::BTreeMap;
 use anyhow::Result;
 
 use crate::display;
-use crate::gh;
+use crate::gh::GhClient;
 
-pub fn run(pr: Option<u64>, all: bool, diff: bool, _unresolved: bool) -> Result<()> {
+pub fn run(
+    gh: &dyn GhClient,
+    pr: Option<u64>,
+    all: bool,
+    diff: bool,
+    _unresolved: bool,
+) -> Result<()> {
     let pr_number = match pr {
         Some(n) => n,
-        None => gh::current_pr_number()?,
+        None => gh.current_pr_number()?,
     };
 
-    let repo = gh::repo_info()?;
-    let threads = gh::review_threads(repo.owner_login(), &repo.name, pr_number)?;
+    let repo = gh.repo_info()?;
+    let threads = gh.review_threads(repo.owner_login(), &repo.name, pr_number)?;
 
     // Filter threads
     let threads: Vec<_> = if all {

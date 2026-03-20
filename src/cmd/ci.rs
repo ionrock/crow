@@ -3,12 +3,12 @@ use std::collections::BTreeMap;
 use anyhow::Result;
 
 use crate::display;
-use crate::gh;
+use crate::gh::GhClient;
 
-pub fn run(pr: Option<u64>, watch: bool) -> Result<()> {
+pub fn run(gh: &dyn GhClient, pr: Option<u64>, watch: bool) -> Result<()> {
     let pr_number = match pr {
         Some(n) => n,
-        None => gh::current_pr_number()?,
+        None => gh.current_pr_number()?,
     };
 
     if watch {
@@ -22,7 +22,7 @@ pub fn run(pr: Option<u64>, watch: bool) -> Result<()> {
         anyhow::bail!("Failed to exec gh pr checks --watch: {}", err);
     }
 
-    let checks = gh::pr_checks(pr_number)?;
+    let checks = gh.pr_checks(pr_number)?;
 
     if checks.is_empty() {
         println!("No CI checks on PR #{}.", pr_number);

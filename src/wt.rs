@@ -17,26 +17,44 @@ fn run_wt(args: &[&str]) -> Result<()> {
     Ok(())
 }
 
-pub fn checkout_pr(pr: u64) -> Result<()> {
-    let target = format!("pr:{}", pr);
-    run_wt(&["switch", &target]).context("Failed to switch to PR worktree")
+// ---------------------------------------------------------------------------
+// WtClient trait
+// ---------------------------------------------------------------------------
+
+pub trait WtClient {
+    fn checkout_pr(&self, pr: u64) -> Result<()>;
+    /// Check out a PR into a worktree and exec into a command, replacing the
+    /// current process. Only returns on error.
+    fn checkout_pr_exec(&self, pr: u64, cmd: &str, args: &[&str]) -> Result<()>;
+    fn remove_current(&self) -> Result<()>;
 }
 
-/// Check out a PR into a worktree and exec into a command, replacing the
-/// current process. Only returns on error.
-pub fn checkout_pr_exec(pr: u64, cmd: &str, args: &[&str]) -> Result<()> {
-    use std::os::unix::process::CommandExt;
+// ---------------------------------------------------------------------------
+// RealWtClient — production implementation backed by the `wt` CLI
+// ---------------------------------------------------------------------------
 
-    let target = format!("pr:{}", pr);
-    let err = Command::new("wt")
-        .args(["switch", &target, "--execute", cmd, "--"])
-        .args(args)
-        .exec();
+pub struct RealWtClient;
 
-    // exec() only returns on error
-    anyhow::bail!("Failed to exec into worktree: {}", err)
-}
+impl WtClient for RealWtClient {
+    fn checkout_pr(&self, pr: u64) -> Result<()> {
+        let target = format!("pr:{}", pr);
+        run_wt(&["switch", &target]).context("Failed to switch to PR worktree")
+    }
 
-pub fn remove_current() -> Result<()> {
-    run_wt(&["remove"]).context("Failed to remove current worktree")
+    fn checkout_pr_exec(&self, pr: u64, cmd: &str, args: &[&str]) -> Result<()> {
+        use std::os::unix::process::CommandExt;
+
+        let target = format!("pr:{}", pr);
+        let err = Command::new("wt")
+            .args(["switch", &target, "--execute", cmd, "--"])
+            .args(args)
+            .exec();
+
+        // exec() only returns on error
+        anyhow::bail!("Failed to exec into worktree: {}", err)
+    }
+
+    fn remove_current(&self) -> Result<()> {
+        run_wt(&["remove"]).context("Failed to remove current worktree")
+    }
 }
