@@ -13,3 +13,21 @@ pub fn run(gh: &dyn GhClient, wt: &dyn WtClient, pr: u64) -> Result<()> {
     // Auto-show unresolved review threads
     reviews::run(gh, Some(pr), false, false, true)
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::test_helpers::{MockGhClient, MockWtClient};
+
+    #[test]
+    fn successful_checkout_records_pr_and_shows_reviews() {
+        let mut mock_gh = MockGhClient::new();
+        mock_gh.threads = vec![];
+
+        let mock_wt = MockWtClient::new();
+
+        run(&mock_gh, &mock_wt, 42).unwrap();
+
+        assert_eq!(mock_wt.checked_out_pr.get(), Some(42));
+    }
+}

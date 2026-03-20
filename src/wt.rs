@@ -3,6 +3,10 @@
 use anyhow::{Context, Result};
 use std::process::Command;
 
+// ---------------------------------------------------------------------------
+// Free functions (used by RealWtClient and directly by review.rs)
+// ---------------------------------------------------------------------------
+
 fn run_wt(args: &[&str]) -> Result<()> {
     let output = Command::new("wt")
         .args(args)

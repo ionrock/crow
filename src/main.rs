@@ -5,6 +5,8 @@ mod cli;
 mod cmd;
 mod display;
 mod gh;
+#[cfg(test)]
+mod test_helpers;
 mod types;
 mod wt;
 

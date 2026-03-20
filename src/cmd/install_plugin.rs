@@ -206,3 +206,110 @@ fn do_uninstall() -> Result<()> {
 
     Ok(())
 }
+
+/// Install plugin files into a specified base directory (for testing).
+#[cfg(test)]
+pub fn install_into(base_dir: &std::path::Path) -> Result<()> {
+    let cache_dir = base_dir
+        .join("plugins/cache/local")
+        .join(PLUGIN_NAME)
+        .join(PLUGIN_VER);
+
+    for file in PLUGIN_FILES {
+        let dest = cache_dir.join(file.path);
+        if let Some(parent) = dest.parent() {
+            fs::create_dir_all(parent)
+                .with_context(|| format!("Failed to create directory for {}", file.path))?;
+        }
+        fs::write(&dest, file.content).with_context(|| format!("Failed to write {}", file.path))?;
+    }
+
+    Ok(())
+}
+
+/// Uninstall plugin files from a specified base directory (for testing).
+#[cfg(test)]
+pub fn uninstall_from(base_dir: &std::path::Path) -> Result<()> {
+    let cache_dir = base_dir
+        .join("plugins/cache/local")
+        .join(PLUGIN_NAME)
+        .join(PLUGIN_VER);
+
+    if cache_dir.exists() {
+        fs::remove_dir_all(&cache_dir).context("Failed to remove plugin cache")?;
+    }
+
+    Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::fs;
+
+    #[test]
+    fn install_into_temp_dir_creates_plugin_files() {
+        let tmp = tempfile::tempdir().expect("failed to create tempdir");
+        install_into(tmp.path()).unwrap();
+
+        let cache_dir = tmp
+            .path()
+            .join("plugins/cache/local")
+            .join(PLUGIN_NAME)
+            .join(PLUGIN_VER);
+
+        assert!(cache_dir.join(".claude-plugin/plugin.json").exists());
+        assert!(cache_dir.join("commands/status.md").exists());
+        assert!(cache_dir.join("commands/reviews.md").exists());
+        assert!(cache_dir.join("commands/ci.md").exists());
+        assert!(cache_dir.join("commands/checkout.md").exists());
+        assert!(cache_dir.join("commands/push.md").exists());
+        assert!(cache_dir.join("commands/done.md").exists());
+        assert!(cache_dir.join("commands/comment.md").exists());
+        assert!(cache_dir.join("skills/review-pr/SKILL.md").exists());
+        assert!(cache_dir.join("agents/pr-reviewer.md").exists());
+    }
+
+    #[test]
+    fn uninstall_from_temp_dir_removes_plugin_files() {
+        let tmp = tempfile::tempdir().expect("failed to create tempdir");
+
+        // Install first
+        install_into(tmp.path()).unwrap();
+
+        let cache_dir = tmp
+            .path()
+            .join("plugins/cache/local")
+            .join(PLUGIN_NAME)
+            .join(PLUGIN_VER);
+        assert!(cache_dir.exists());
+
+        // Then uninstall
+        uninstall_from(tmp.path()).unwrap();
+        assert!(!cache_dir.exists());
+    }
+
+    #[test]
+    fn install_writes_correct_plugin_json_content() {
+        let tmp = tempfile::tempdir().expect("failed to create tempdir");
+        install_into(tmp.path()).unwrap();
+
+        let cache_dir = tmp
+            .path()
+            .join("plugins/cache/local")
+            .join(PLUGIN_NAME)
+            .join(PLUGIN_VER);
+
+        let content = fs::read_to_string(cache_dir.join(".claude-plugin/plugin.json")).unwrap();
+        // The embedded plugin.json should be valid JSON
+        let parsed: serde_json::Value = serde_json::from_str(&content).unwrap();
+        assert!(parsed.is_object());
+    }
+
+    #[test]
+    fn uninstall_from_nonexistent_dir_is_noop() {
+        let tmp = tempfile::tempdir().expect("failed to create tempdir");
+        // Never installed — should succeed without error
+        uninstall_from(tmp.path()).unwrap();
+    }
+}

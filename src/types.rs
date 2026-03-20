@@ -1,7 +1,7 @@
 use serde::Deserialize;
 
 #[allow(dead_code)]
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Clone, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct Pr {
     pub number: u64,
@@ -14,7 +14,7 @@ pub struct Pr {
 }
 
 #[allow(dead_code)]
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Clone, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct ReviewThread {
     pub id: String,
@@ -26,13 +26,13 @@ pub struct ReviewThread {
     pub comments: ThreadComments,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Clone, Deserialize)]
 pub struct ThreadComments {
     pub nodes: Vec<ThreadComment>,
 }
 
 #[allow(dead_code)]
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Clone, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct ThreadComment {
     pub id: String,
@@ -44,7 +44,7 @@ pub struct ThreadComment {
 }
 
 #[allow(dead_code)]
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Clone, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct CheckRun {
     pub name: String,
@@ -56,17 +56,17 @@ pub struct CheckRun {
     pub link: String,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Clone, Deserialize)]
 pub struct WorkflowInfo {
     pub name: String,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Clone, Deserialize)]
 pub struct Author {
     pub login: String,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Clone, Deserialize)]
 pub struct RepoInfo {
     pub owner: OwnerInfo,
     pub name: String,
@@ -78,13 +78,13 @@ impl RepoInfo {
     }
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Clone, Deserialize)]
 pub struct OwnerInfo {
     pub login: String,
 }
 
 #[allow(dead_code)]
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Clone, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct PrDetail {
     pub number: u64,
@@ -98,7 +98,7 @@ pub struct PrDetail {
 }
 
 #[allow(dead_code)]
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Clone, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct PrFile {
     pub path: String,
