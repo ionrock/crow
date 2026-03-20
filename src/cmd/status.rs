@@ -1,11 +1,11 @@
 use anyhow::Result;
 
 use crate::display;
-use crate::gh;
+use crate::gh::GhClient;
 
-pub fn run() -> Result<()> {
-    let authored = gh::pr_list_authored()?;
-    let review_requested = gh::pr_list_review_requested()?;
+pub fn run(gh: &dyn GhClient) -> Result<()> {
+    let authored = gh.pr_list_authored()?;
+    let review_requested = gh.pr_list_review_requested()?;
 
     if authored.is_empty() && review_requested.is_empty() {
         println!("No PRs needing attention.");

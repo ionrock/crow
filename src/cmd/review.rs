@@ -1,18 +1,18 @@
 use anyhow::{Context, Result};
 use owo_colors::OwoColorize;
 
-use crate::gh;
-use crate::wt;
+use crate::gh::GhClient;
+use crate::wt::WtClient;
 
-pub fn run(pr: u64) -> Result<()> {
+pub fn run(gh: &dyn GhClient, wt: &dyn WtClient, pr: u64) -> Result<()> {
     // Gather PR context before switching worktrees
     println!("Fetching PR #{} details...", pr);
 
-    let detail = gh::pr_view(pr)?;
-    let diff = gh::pr_diff(pr)?;
+    let detail = gh.pr_view(pr)?;
+    let diff = gh.pr_diff(pr)?;
 
-    let repo = gh::repo_info()?;
-    let threads = gh::review_threads(repo.owner_login(), &repo.name, pr)?;
+    let repo = gh.repo_info()?;
+    let threads = gh.review_threads(repo.owner_login(), &repo.name, pr)?;
 
     let prompt = build_prompt(&detail, &diff, &threads);
 
@@ -23,7 +23,7 @@ pub fn run(pr: u64) -> Result<()> {
     );
 
     // Exec into worktree with claude session — does not return on success
-    wt::checkout_pr_exec(pr, "claude", &["--dangerously-skip-permissions", &prompt])
+    wt.checkout_pr_exec(pr, "claude", &["--dangerously-skip-permissions", &prompt])
         .context("Failed to launch review session")
 }
 

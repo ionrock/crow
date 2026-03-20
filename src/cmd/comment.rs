@@ -3,9 +3,9 @@ use owo_colors::OwoColorize;
 use std::io::Read;
 
 use crate::cli::ReviewEvent;
-use crate::gh;
+use crate::gh::GhClient;
 
-pub fn run(pr: u64, event: ReviewEvent, body: Option<String>) -> Result<()> {
+pub fn run(gh: &dyn GhClient, pr: u64, event: ReviewEvent, body: Option<String>) -> Result<()> {
     let body = match body {
         Some(b) => b,
         None => {
@@ -44,7 +44,7 @@ pub fn run(pr: u64, event: ReviewEvent, body: Option<String>) -> Result<()> {
         ReviewEvent::Comment => "comment",
     };
 
-    gh::post_review(pr, event_flag, &body)?;
+    gh.post_review(pr, event_flag, &body)?;
 
     let action = match event {
         ReviewEvent::Approve => "Approved",

@@ -2,9 +2,9 @@ use anyhow::{Context, Result};
 use owo_colors::OwoColorize;
 use std::process::Command;
 
-use crate::gh;
+use crate::gh::GhClient;
 
-pub fn run(reply: Option<String>) -> Result<()> {
+pub fn run(gh: &dyn GhClient, reply: Option<String>) -> Result<()> {
     // Run git push
     let output = Command::new("git")
         .args(["push"])
@@ -20,9 +20,9 @@ pub fn run(reply: Option<String>) -> Result<()> {
 
     // If --reply provided, batch-reply to all unresolved threads
     if let Some(msg) = reply {
-        let repo = gh::repo_info()?;
-        let pr = gh::current_pr_number()?;
-        let threads = gh::review_threads(repo.owner_login(), &repo.name, pr)?;
+        let repo = gh.repo_info()?;
+        let pr = gh.current_pr_number()?;
+        let threads = gh.review_threads(repo.owner_login(), &repo.name, pr)?;
 
         let unresolved: Vec<_> = threads.iter().filter(|t| !t.is_resolved).collect();
 
@@ -35,7 +35,7 @@ pub fn run(reply: Option<String>) -> Result<()> {
         for thread in &unresolved {
             // Reply to the last comment in each thread
             if let Some(last_comment) = thread.comments.nodes.last() {
-                gh::reply_to_thread(repo.owner_login(), &repo.name, pr, &last_comment.id, &msg)?;
+                gh.reply_to_thread(repo.owner_login(), &repo.name, pr, &last_comment.id, &msg)?;
                 replied += 1;
             }
         }

@@ -31,62 +31,8 @@ fn gh_json<T: DeserializeOwned>(args: &[&str]) -> Result<T> {
 }
 
 // ---------------------------------------------------------------------------
-// Public API
+// GraphQL — review threads (private intermediate structs)
 // ---------------------------------------------------------------------------
-
-pub fn current_pr_number() -> Result<u64> {
-    #[derive(Deserialize)]
-    struct PrNumber {
-        number: u64,
-    }
-
-    let pr: PrNumber = gh_json(&["pr", "view", "--json", "number"])
-        .context("Not on a PR branch — run this from a branch associated with a pull request")?;
-
-    Ok(pr.number)
-}
-
-pub fn pr_list_authored() -> Result<Vec<Pr>> {
-    gh_json(&[
-        "pr",
-        "list",
-        "--author",
-        "@me",
-        "--json",
-        "number,title,headRefName,reviewDecision,updatedAt,url",
-    ])
-    .context("Failed to list authored PRs")
-}
-
-pub fn pr_list_review_requested() -> Result<Vec<Pr>> {
-    gh_json(&[
-        "pr",
-        "list",
-        "--search",
-        "review-requested:@me",
-        "--json",
-        "number,title,headRefName,author,updatedAt,url",
-    ])
-    .context("Failed to list PRs with review requested")
-}
-
-pub fn pr_checks(pr: u64) -> Result<Vec<CheckRun>> {
-    let pr_str = pr.to_string();
-    gh_json(&[
-        "pr",
-        "checks",
-        &pr_str,
-        "--json",
-        "name,state,bucket,description,workflow,completedAt,link",
-    ])
-    .context("Failed to fetch PR checks")
-}
-
-// ---------------------------------------------------------------------------
-// GraphQL — review threads
-// ---------------------------------------------------------------------------
-
-// Private intermediate structs for deserializing the GraphQL response.
 
 #[derive(Deserialize)]
 struct GraphQLResponse {
@@ -175,177 +121,230 @@ const REVIEW_THREADS_QUERY: &str = r#"query($owner: String!, $repo: String!, $nu
   }
 }"#;
 
-pub fn review_threads(owner: &str, repo: &str, pr: u64) -> Result<Vec<ReviewThread>> {
-    let pr_str = pr.to_string();
-    let bytes = run_gh(&[
-        "api",
-        "graphql",
-        "-f",
-        &format!("query={}", REVIEW_THREADS_QUERY),
-        "-f",
-        &format!("owner={}", owner),
-        "-f",
-        &format!("repo={}", repo),
-        "-F",
-        &format!("number={}", pr_str),
-    ])
-    .context("Failed to fetch review threads")?;
+// ---------------------------------------------------------------------------
+// GhClient trait
+// ---------------------------------------------------------------------------
 
-    let response: GraphQLResponse =
-        serde_json::from_slice(&bytes).context("Failed to parse GraphQL response")?;
-
-    let threads = response
-        .data
-        .repository
-        .pull_request
-        .review_threads
-        .nodes
-        .into_iter()
-        .map(|node| {
-            let comments = node
-                .comments
-                .nodes
-                .into_iter()
-                .map(|c| ThreadComment {
-                    id: c.id,
-                    author: crate::types::Author {
-                        login: c.author.login,
-                    },
-                    body: c.body,
-                    created_at: c.created_at,
-                    url: c.url,
-                    diff_hunk: c.diff_hunk,
-                })
-                .collect();
-
-            ReviewThread {
-                id: node.id,
-                is_resolved: node.is_resolved,
-                is_outdated: node.is_outdated,
-                path: node.path,
-                line: node.line,
-                start_line: node.start_line,
-                comments: ThreadComments { nodes: comments },
-            }
-        })
-        .collect();
-
-    Ok(threads)
+pub trait GhClient {
+    fn current_pr_number(&self) -> Result<u64>;
+    fn pr_list_authored(&self) -> Result<Vec<Pr>>;
+    fn pr_list_review_requested(&self) -> Result<Vec<Pr>>;
+    fn pr_checks(&self, pr: u64) -> Result<Vec<CheckRun>>;
+    fn review_threads(&self, owner: &str, repo: &str, pr: u64) -> Result<Vec<ReviewThread>>;
+    fn repo_info(&self) -> Result<RepoInfo>;
+    fn reply_to_thread(
+        &self,
+        owner: &str,
+        repo: &str,
+        pr: u64,
+        comment_id: &str,
+        body: &str,
+    ) -> Result<()>;
+    fn current_user(&self) -> Result<String>;
+    fn pr_author(&self, pr: u64) -> Result<String>;
+    fn post_review(&self, pr: u64, event: &str, body: &str) -> Result<()>;
+    fn pr_view(&self, pr: u64) -> Result<PrDetail>;
+    fn pr_diff(&self, pr: u64) -> Result<String>;
+    fn mark_ready(&self, pr: u64) -> Result<()>;
 }
 
 // ---------------------------------------------------------------------------
-// Repo info
+// RealGhClient — production implementation backed by the `gh` CLI
 // ---------------------------------------------------------------------------
 
-pub fn repo_info() -> Result<RepoInfo> {
-    // `gh repo view --json owner,name` returns:
-    //   { "owner": { "login": "..." }, "name": "..." }
-    // RepoInfo already mirrors this structure (owner: OwnerInfo { login }),
-    // so we can deserialize directly.
-    gh_json(&["repo", "view", "--json", "owner,name"]).context("Failed to fetch repo info")
-}
+pub struct RealGhClient;
 
-// ---------------------------------------------------------------------------
-// Reply to a review thread
-// ---------------------------------------------------------------------------
+impl GhClient for RealGhClient {
+    fn current_pr_number(&self) -> Result<u64> {
+        #[derive(Deserialize)]
+        struct PrNumber {
+            number: u64,
+        }
 
-pub fn reply_to_thread(
-    owner: &str,
-    repo: &str,
-    pr: u64,
-    comment_id: &str,
-    body: &str,
-) -> Result<()> {
-    let endpoint = format!("repos/{}/{}/pulls/{}/comments", owner, repo, pr);
-    run_gh(&[
-        "api",
-        &endpoint,
-        "-f",
-        &format!("body={}", body),
-        "-F",
-        &format!("in_reply_to={}", comment_id),
-    ])
-    .context("Failed to reply to review thread")?;
-    Ok(())
-}
+        let pr: PrNumber = gh_json(&["pr", "view", "--json", "number"]).context(
+            "Not on a PR branch — run this from a branch associated with a pull request",
+        )?;
 
-// ---------------------------------------------------------------------------
-// Current authenticated user
-// ---------------------------------------------------------------------------
+        Ok(pr.number)
+    }
 
-pub fn current_user() -> Result<String> {
-    let bytes =
-        run_gh(&["api", "user", "--jq", ".login"]).context("Failed to fetch current user")?;
-    let login = String::from_utf8(bytes)
-        .context("gh returned non-UTF-8 output for user login")?
-        .trim()
-        .to_string();
-    Ok(login)
-}
+    fn pr_list_authored(&self) -> Result<Vec<Pr>> {
+        gh_json(&[
+            "pr",
+            "list",
+            "--author",
+            "@me",
+            "--json",
+            "number,title,headRefName,reviewDecision,updatedAt,url",
+        ])
+        .context("Failed to list authored PRs")
+    }
 
-// ---------------------------------------------------------------------------
-// PR author login
-// ---------------------------------------------------------------------------
+    fn pr_list_review_requested(&self) -> Result<Vec<Pr>> {
+        gh_json(&[
+            "pr",
+            "list",
+            "--search",
+            "review-requested:@me",
+            "--json",
+            "number,title,headRefName,author,updatedAt,url",
+        ])
+        .context("Failed to list PRs with review requested")
+    }
 
-pub fn pr_author(pr: u64) -> Result<String> {
-    let pr_str = pr.to_string();
-    let bytes = run_gh(&[
-        "pr",
-        "view",
-        &pr_str,
-        "--json",
-        "author",
-        "--jq",
-        ".author.login",
-    ])
-    .context("Failed to fetch PR author")?;
-    let login = String::from_utf8(bytes)
-        .context("gh returned non-UTF-8 output for PR author")?
-        .trim()
-        .to_string();
-    Ok(login)
-}
+    fn pr_checks(&self, pr: u64) -> Result<Vec<CheckRun>> {
+        let pr_str = pr.to_string();
+        gh_json(&[
+            "pr",
+            "checks",
+            &pr_str,
+            "--json",
+            "name,state,bucket,description,workflow,completedAt,link",
+        ])
+        .context("Failed to fetch PR checks")
+    }
 
-// ---------------------------------------------------------------------------
-// Post a review
-// ---------------------------------------------------------------------------
+    fn review_threads(&self, owner: &str, repo: &str, pr: u64) -> Result<Vec<ReviewThread>> {
+        let pr_str = pr.to_string();
+        let bytes = run_gh(&[
+            "api",
+            "graphql",
+            "-f",
+            &format!("query={}", REVIEW_THREADS_QUERY),
+            "-f",
+            &format!("owner={}", owner),
+            "-f",
+            &format!("repo={}", repo),
+            "-F",
+            &format!("number={}", pr_str),
+        ])
+        .context("Failed to fetch review threads")?;
 
-pub fn post_review(pr: u64, event: &str, body: &str) -> Result<()> {
-    let pr_str = pr.to_string();
-    let event_flag = format!("--{}", event);
-    run_gh(&["pr", "review", &pr_str, &event_flag, "--body", body])
-        .context("Failed to post review")?;
-    Ok(())
-}
+        let response: GraphQLResponse =
+            serde_json::from_slice(&bytes).context("Failed to parse GraphQL response")?;
 
-// ---------------------------------------------------------------------------
-// PR description and diff for review context
-// ---------------------------------------------------------------------------
+        let threads = response
+            .data
+            .repository
+            .pull_request
+            .review_threads
+            .nodes
+            .into_iter()
+            .map(|node| {
+                let comments = node
+                    .comments
+                    .nodes
+                    .into_iter()
+                    .map(|c| ThreadComment {
+                        id: c.id,
+                        author: crate::types::Author {
+                            login: c.author.login,
+                        },
+                        body: c.body,
+                        created_at: c.created_at,
+                        url: c.url,
+                        diff_hunk: c.diff_hunk,
+                    })
+                    .collect();
 
-pub fn pr_view(pr: u64) -> Result<PrDetail> {
-    let pr_str = pr.to_string();
-    gh_json(&[
-        "pr",
-        "view",
-        &pr_str,
-        "--json",
-        "number,title,body,headRefName,baseRefName,author,url,files",
-    ])
-    .context("Failed to fetch PR details")
-}
+                ReviewThread {
+                    id: node.id,
+                    is_resolved: node.is_resolved,
+                    is_outdated: node.is_outdated,
+                    path: node.path,
+                    line: node.line,
+                    start_line: node.start_line,
+                    comments: ThreadComments { nodes: comments },
+                }
+            })
+            .collect();
 
-pub fn pr_diff(pr: u64) -> Result<String> {
-    let pr_str = pr.to_string();
-    let bytes = run_gh(&["pr", "diff", &pr_str]).context("Failed to fetch PR diff")?;
-    String::from_utf8(bytes).context("PR diff is not valid UTF-8")
-}
+        Ok(threads)
+    }
 
-// ---------------------------------------------------------------------------
-// Mark PR as ready for review
-// ---------------------------------------------------------------------------
+    fn repo_info(&self) -> Result<RepoInfo> {
+        gh_json(&["repo", "view", "--json", "owner,name"]).context("Failed to fetch repo info")
+    }
 
-pub fn mark_ready(pr: u64) -> Result<()> {
-    let pr_str = pr.to_string();
-    run_gh(&["pr", "ready", &pr_str]).context("Failed to mark PR as ready")?;
-    Ok(())
+    fn reply_to_thread(
+        &self,
+        owner: &str,
+        repo: &str,
+        pr: u64,
+        comment_id: &str,
+        body: &str,
+    ) -> Result<()> {
+        let endpoint = format!("repos/{}/{}/pulls/{}/comments", owner, repo, pr);
+        run_gh(&[
+            "api",
+            &endpoint,
+            "-f",
+            &format!("body={}", body),
+            "-F",
+            &format!("in_reply_to={}", comment_id),
+        ])
+        .context("Failed to reply to review thread")?;
+        Ok(())
+    }
+
+    fn current_user(&self) -> Result<String> {
+        let bytes =
+            run_gh(&["api", "user", "--jq", ".login"]).context("Failed to fetch current user")?;
+        let login = String::from_utf8(bytes)
+            .context("gh returned non-UTF-8 output for user login")?
+            .trim()
+            .to_string();
+        Ok(login)
+    }
+
+    fn pr_author(&self, pr: u64) -> Result<String> {
+        let pr_str = pr.to_string();
+        let bytes = run_gh(&[
+            "pr",
+            "view",
+            &pr_str,
+            "--json",
+            "author",
+            "--jq",
+            ".author.login",
+        ])
+        .context("Failed to fetch PR author")?;
+        let login = String::from_utf8(bytes)
+            .context("gh returned non-UTF-8 output for PR author")?
+            .trim()
+            .to_string();
+        Ok(login)
+    }
+
+    fn post_review(&self, pr: u64, event: &str, body: &str) -> Result<()> {
+        let pr_str = pr.to_string();
+        let event_flag = format!("--{}", event);
+        run_gh(&["pr", "review", &pr_str, &event_flag, "--body", body])
+            .context("Failed to post review")?;
+        Ok(())
+    }
+
+    fn pr_view(&self, pr: u64) -> Result<PrDetail> {
+        let pr_str = pr.to_string();
+        gh_json(&[
+            "pr",
+            "view",
+            &pr_str,
+            "--json",
+            "number,title,body,headRefName,baseRefName,author,url,files",
+        ])
+        .context("Failed to fetch PR details")
+    }
+
+    fn pr_diff(&self, pr: u64) -> Result<String> {
+        let pr_str = pr.to_string();
+        let bytes = run_gh(&["pr", "diff", &pr_str]).context("Failed to fetch PR diff")?;
+        String::from_utf8(bytes).context("PR diff is not valid UTF-8")
+    }
+
+    fn mark_ready(&self, pr: u64) -> Result<()> {
+        let pr_str = pr.to_string();
+        run_gh(&["pr", "ready", &pr_str]).context("Failed to mark PR as ready")?;
+        Ok(())
+    }
 }

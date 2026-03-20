@@ -2,13 +2,13 @@ use anyhow::{Context, Result};
 use owo_colors::OwoColorize;
 use std::process::Command;
 
-use crate::gh;
-use crate::wt;
+use crate::gh::GhClient;
+use crate::wt::WtClient;
 
-pub fn run(ready: bool) -> Result<()> {
-    let pr = gh::current_pr_number()?;
-    let pr_author = gh::pr_author(pr)?;
-    let current_user = gh::current_user()?;
+pub fn run(gh: &dyn GhClient, wt: &dyn WtClient, ready: bool) -> Result<()> {
+    let pr = gh.current_pr_number()?;
+    let pr_author = gh.pr_author(pr)?;
+    let current_user = gh.current_user()?;
     let is_own_pr = pr_author == current_user;
 
     if is_own_pr {
@@ -23,12 +23,12 @@ pub fn run(ready: bool) -> Result<()> {
         }
 
         if ready {
-            gh::mark_ready(pr)?;
+            gh.mark_ready(pr)?;
             println!("Marked PR #{} as {}.", pr, "ready for review".green());
         }
     }
 
-    wt::remove_current()?;
+    wt.remove_current()?;
     println!("Removed worktree for PR #{}.", pr);
 
     Ok(())
