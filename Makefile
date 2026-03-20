@@ -1,4 +1,4 @@
-.PHONY: build release install install-plugin uninstall-plugin test lint fmt check clean
+.PHONY: build release install install-plugin uninstall-plugin test coverage lint fmt check clean
 
 build:
 	cargo build
@@ -17,6 +17,9 @@ uninstall-plugin:
 
 test:
 	cargo test
+
+coverage:
+	cargo llvm-cov --text
 
 lint:
 	cargo clippy --all-targets -- -D warnings

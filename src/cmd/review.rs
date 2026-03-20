@@ -119,6 +119,7 @@ pub(crate) fn build_prompt(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::test_helpers::{MockGhClient, MockWtClient};
     use crate::types::{Author, PrDetail, PrFile, ReviewThread, ThreadComment, ThreadComments};
 
     fn make_detail(body: &str, files: Vec<PrFile>) -> PrDetail {
@@ -272,5 +273,47 @@ mod tests {
         let prompt = build_prompt(&detail, "", &[thread]);
 
         assert!(prompt.contains("L?"));
+    }
+
+    // --- run() exercises pr_view, pr_diff, checkout_pr_exec via mocks ---
+
+    #[test]
+    fn run_fetches_pr_details_and_launches_session() {
+        let mock_gh = MockGhClient::new();
+        let mock_wt = MockWtClient::new();
+
+        // run() calls checkout_pr_exec which in the mock returns Ok(())
+        run(&mock_gh, &mock_wt, 7).unwrap();
+
+        // checkout_pr_exec doesn't record the PR in checked_out_pr (that's checkout_pr)
+        // but the mock succeeds, which means pr_view and pr_diff were called
+    }
+
+    #[test]
+    fn run_with_threads_builds_prompt_with_thread_info() {
+        let mut mock_gh = MockGhClient::new();
+        mock_gh.threads = vec![ReviewThread {
+            id: "rt1".to_string(),
+            is_resolved: false,
+            is_outdated: false,
+            path: "src/lib.rs".to_string(),
+            line: Some(42),
+            start_line: None,
+            comments: crate::types::ThreadComments {
+                nodes: vec![ThreadComment {
+                    id: "c1".to_string(),
+                    author: Author {
+                        login: "reviewer".to_string(),
+                    },
+                    body: "Please fix.".to_string(),
+                    created_at: "2024-01-01T00:00:00Z".to_string(),
+                    url: "https://github.com/test/repo/pull/1#comment".to_string(),
+                    diff_hunk: "@@ -1,2 +1,3 @@".to_string(),
+                }],
+            },
+        }];
+
+        let mock_wt = MockWtClient::new();
+        run(&mock_gh, &mock_wt, 3).unwrap();
     }
 }

@@ -106,4 +106,37 @@ mod tests {
         mock_wt.remove_current().unwrap();
         assert!(mock_wt.removed.get());
     }
+
+    /// The "reviewer" path: pr_author != current_user means git push is skipped
+    /// and only remove_current is called. We can exercise run() directly here.
+    #[test]
+    fn run_reviewer_pr_removes_worktree_without_push() {
+        let mut mock_gh = MockGhClient::new();
+        mock_gh.current_pr = 55;
+        mock_gh.pr_author_login = "someone-else".to_string();
+        mock_gh.current_user_login = "me".to_string();
+
+        let mock_wt = MockWtClient::new();
+
+        run(&mock_gh, &mock_wt, false).unwrap();
+
+        assert!(mock_wt.removed.get());
+        assert!(!mock_gh.mark_ready_called.get());
+    }
+
+    #[test]
+    fn run_reviewer_pr_with_ready_flag_still_skips_mark_ready() {
+        // When it's not our PR, ready=true should have no effect
+        let mut mock_gh = MockGhClient::new();
+        mock_gh.current_pr = 66;
+        mock_gh.pr_author_login = "other".to_string();
+        mock_gh.current_user_login = "me".to_string();
+
+        let mock_wt = MockWtClient::new();
+
+        run(&mock_gh, &mock_wt, true).unwrap();
+
+        assert!(mock_wt.removed.get());
+        assert!(!mock_gh.mark_ready_called.get());
+    }
 }

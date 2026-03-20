@@ -46,6 +46,8 @@ make install
 | `make install` | Release build + install to Cargo bin dir |
 | `make install-plugin` | Install binary then install the Claude Code plugin |
 | `make uninstall-plugin` | Uninstall the Claude Code plugin |
+| `make test` | Run the test suite |
+| `make coverage` | Run tests with line coverage report (requires `cargo-llvm-cov`) |
 | `make check` | Format, lint, test, and build |
 | `make clean` | Remove build artifacts |
 
@@ -391,6 +393,9 @@ make build
 # Run tests
 make test
 
+# Check line coverage (requires cargo-llvm-cov: cargo install cargo-llvm-cov)
+make coverage
+
 # Lint and format
 make lint
 make fmt
@@ -400,6 +405,28 @@ make check
 ```
 
 Please ensure `make check` passes before submitting a pull request.
+
+### Coverage
+
+Install the coverage tool once:
+
+```sh
+cargo install cargo-llvm-cov
+```
+
+Then run:
+
+```sh
+make coverage
+```
+
+This prints a line-by-line coverage report. The following modules are excluded from coverage targets because they require live external processes (`gh`, `wt`, `git`) or are the binary entrypoint:
+
+- `gh.rs` — wraps the `gh` CLI; requires a real GitHub token
+- `wt.rs` — wraps the `wt` worktree tool
+- `main.rs` — process entrypoint
+- `cmd/push.rs` and `cmd/done.rs` (partially) — paths that call `git push`
+- `cmd/ci.rs` — `--watch` path execs into `gh pr checks --watch`
 
 ## License
 

@@ -107,4 +107,49 @@ mod tests {
         let reviews = mock.reviews.borrow();
         assert_eq!(reviews[0].body, "body text");
     }
+
+    /// When body is None, we open an editor. Use a write-then-true script so the
+    /// temp file has content when we read it back. We rely on a small shell script
+    /// as EDITOR that writes a fixed string to the file it receives as $1.
+    #[test]
+    fn no_body_opens_editor_and_reads_content() {
+        // Build a tiny shell script that writes a known string into $1
+        let script_dir = tempfile::tempdir().expect("tmpdir");
+        let script = script_dir.path().join("fake_editor.sh");
+        std::fs::write(&script, "#!/bin/sh\necho 'review content' > \"$1\"\n").unwrap();
+        // Make it executable
+        use std::os::unix::fs::PermissionsExt;
+        let mut perms = std::fs::metadata(&script).unwrap().permissions();
+        perms.set_mode(0o755);
+        std::fs::set_permissions(&script, perms).unwrap();
+
+        let mock = MockGhClient::new();
+        // Point EDITOR at our fake script
+        std::env::set_var("EDITOR", script.to_str().unwrap());
+
+        run(&mock, 2, ReviewEvent::Approve, None).unwrap();
+
+        let reviews = mock.reviews.borrow();
+        assert_eq!(reviews.len(), 1);
+        assert_eq!(reviews[0].event, "approve");
+        assert!(reviews[0].body.contains("review content"));
+
+        // Restore
+        std::env::remove_var("EDITOR");
+    }
+
+    /// When the editor produces an empty file, run() returns an error.
+    #[test]
+    fn no_body_empty_editor_output_returns_error() {
+        // Use /usr/bin/true as editor — it succeeds but writes nothing
+        let mock = MockGhClient::new();
+        std::env::set_var("EDITOR", "/usr/bin/true");
+
+        let result = run(&mock, 3, ReviewEvent::Comment, None);
+        assert!(result.is_err());
+        let msg = format!("{:#}", result.unwrap_err());
+        assert!(msg.contains("Empty review body"), "got: {}", msg);
+
+        std::env::remove_var("EDITOR");
+    }
 }

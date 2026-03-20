@@ -1,7 +1,7 @@
 use anyhow::{Context, Result};
 use owo_colors::OwoColorize;
 use std::fs;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 
 const PLUGIN_NAME: &str = "crow";
 const PLUGIN_VER: &str = env!("CARGO_PKG_VERSION");
@@ -67,27 +67,29 @@ const PLUGIN_FILES: &[PluginFile] = &[
     },
 ];
 
-fn claude_dir() -> Result<PathBuf> {
-    let home = std::env::var("HOME").context("HOME not set")?;
-    Ok(PathBuf::from(home).join(".claude"))
+fn claude_dir_from(base: &Path) -> PathBuf {
+    base.join(".claude")
 }
 
-fn plugin_cache_dir() -> Result<PathBuf> {
-    Ok(claude_dir()?.join(format!(
+fn plugin_cache_dir_from(claude: &Path) -> PathBuf {
+    claude.join(format!(
         "plugins/cache/local/{}/{}",
         PLUGIN_NAME, PLUGIN_VER
-    )))
+    ))
 }
 
 pub fn run(uninstall: bool) -> Result<()> {
+    let home = std::env::var("HOME").context("HOME not set")?;
+    let base = PathBuf::from(home);
     if uninstall {
-        return do_uninstall();
+        return do_uninstall_in(&base);
     }
-    do_install()
+    do_install_in(&base)
 }
 
-fn do_install() -> Result<()> {
-    let cache_dir = plugin_cache_dir()?;
+fn do_install_in(base: &Path) -> Result<()> {
+    let claude = claude_dir_from(base);
+    let cache_dir = plugin_cache_dir_from(&claude);
 
     // Write all plugin files
     for file in PLUGIN_FILES {
@@ -106,7 +108,7 @@ fn do_install() -> Result<()> {
     );
 
     // Register in installed_plugins.json
-    let plugins_json_path = claude_dir()?.join("plugins/installed_plugins.json");
+    let plugins_json_path = claude.join("plugins/installed_plugins.json");
     if plugins_json_path.exists() {
         let content = fs::read_to_string(&plugins_json_path)
             .context("Failed to read installed_plugins.json")?;
@@ -138,7 +140,7 @@ fn do_install() -> Result<()> {
     }
 
     // Enable in settings.json
-    let settings_path = claude_dir()?.join("settings.json");
+    let settings_path = claude.join("settings.json");
     if settings_path.exists() {
         let content = fs::read_to_string(&settings_path).context("Failed to read settings.json")?;
         let mut doc: serde_json::Value =
@@ -166,8 +168,9 @@ fn do_install() -> Result<()> {
     Ok(())
 }
 
-fn do_uninstall() -> Result<()> {
-    let cache_dir = plugin_cache_dir()?;
+fn do_uninstall_in(base: &Path) -> Result<()> {
+    let claude = claude_dir_from(base);
+    let cache_dir = plugin_cache_dir_from(&claude);
 
     // Remove plugin files
     if cache_dir.exists() {
@@ -176,7 +179,7 @@ fn do_uninstall() -> Result<()> {
     }
 
     // Deregister from installed_plugins.json
-    let plugins_json_path = claude_dir()?.join("plugins/installed_plugins.json");
+    let plugins_json_path = claude.join("plugins/installed_plugins.json");
     if plugins_json_path.exists() {
         let content = fs::read_to_string(&plugins_json_path)?;
         let mut doc: serde_json::Value = serde_json::from_str(&content)?;
@@ -188,7 +191,7 @@ fn do_uninstall() -> Result<()> {
     }
 
     // Disable in settings.json
-    let settings_path = claude_dir()?.join("settings.json");
+    let settings_path = claude.join("settings.json");
     if settings_path.exists() {
         let content = fs::read_to_string(&settings_path)?;
         let mut doc: serde_json::Value = serde_json::from_str(&content)?;
@@ -207,57 +210,26 @@ fn do_uninstall() -> Result<()> {
     Ok(())
 }
 
-/// Install plugin files into a specified base directory (for testing).
-#[cfg(test)]
-pub fn install_into(base_dir: &std::path::Path) -> Result<()> {
-    let cache_dir = base_dir
-        .join("plugins/cache/local")
-        .join(PLUGIN_NAME)
-        .join(PLUGIN_VER);
-
-    for file in PLUGIN_FILES {
-        let dest = cache_dir.join(file.path);
-        if let Some(parent) = dest.parent() {
-            fs::create_dir_all(parent)
-                .with_context(|| format!("Failed to create directory for {}", file.path))?;
-        }
-        fs::write(&dest, file.content).with_context(|| format!("Failed to write {}", file.path))?;
-    }
-
-    Ok(())
-}
-
-/// Uninstall plugin files from a specified base directory (for testing).
-#[cfg(test)]
-pub fn uninstall_from(base_dir: &std::path::Path) -> Result<()> {
-    let cache_dir = base_dir
-        .join("plugins/cache/local")
-        .join(PLUGIN_NAME)
-        .join(PLUGIN_VER);
-
-    if cache_dir.exists() {
-        fs::remove_dir_all(&cache_dir).context("Failed to remove plugin cache")?;
-    }
-
-    Ok(())
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
     use std::fs;
 
-    #[test]
-    fn install_into_temp_dir_creates_plugin_files() {
-        let tmp = tempfile::tempdir().expect("failed to create tempdir");
-        install_into(tmp.path()).unwrap();
-
-        let cache_dir = tmp
-            .path()
+    fn cache_dir_for(base: &std::path::Path) -> PathBuf {
+        claude_dir_from(base)
             .join("plugins/cache/local")
             .join(PLUGIN_NAME)
-            .join(PLUGIN_VER);
+            .join(PLUGIN_VER)
+    }
 
+    // --- do_install_in ---
+
+    #[test]
+    fn do_install_in_creates_all_plugin_files() {
+        let tmp = tempfile::tempdir().expect("failed to create tempdir");
+        do_install_in(tmp.path()).unwrap();
+
+        let cache_dir = cache_dir_for(tmp.path());
         assert!(cache_dir.join(".claude-plugin/plugin.json").exists());
         assert!(cache_dir.join("commands/status.md").exists());
         assert!(cache_dir.join("commands/reviews.md").exists());
@@ -271,45 +243,160 @@ mod tests {
     }
 
     #[test]
-    fn uninstall_from_temp_dir_removes_plugin_files() {
+    fn do_install_in_writes_valid_plugin_json() {
+        let tmp = tempfile::tempdir().expect("failed to create tempdir");
+        do_install_in(tmp.path()).unwrap();
+
+        let cache_dir = cache_dir_for(tmp.path());
+        let content = fs::read_to_string(cache_dir.join(".claude-plugin/plugin.json")).unwrap();
+        let parsed: serde_json::Value = serde_json::from_str(&content).unwrap();
+        assert!(parsed.is_object());
+    }
+
+    #[test]
+    fn do_install_in_skips_plugins_json_when_absent() {
+        // Without a pre-existing installed_plugins.json, the install should still succeed
+        let tmp = tempfile::tempdir().expect("failed to create tempdir");
+        do_install_in(tmp.path()).unwrap();
+
+        // The installed_plugins.json should NOT have been created
+        let plugins_json = tmp.path().join(".claude/plugins/installed_plugins.json");
+        assert!(!plugins_json.exists());
+    }
+
+    #[test]
+    fn do_install_in_registers_in_existing_plugins_json() {
+        let tmp = tempfile::tempdir().expect("failed to create tempdir");
+        let claude = tmp.path().join(".claude");
+        let plugins_dir = claude.join("plugins");
+        fs::create_dir_all(&plugins_dir).unwrap();
+        let plugins_json_path = plugins_dir.join("installed_plugins.json");
+        fs::write(&plugins_json_path, r#"{"plugins":{}}"#).unwrap();
+
+        do_install_in(tmp.path()).unwrap();
+
+        let content = fs::read_to_string(&plugins_json_path).unwrap();
+        let doc: serde_json::Value = serde_json::from_str(&content).unwrap();
+        assert!(doc["plugins"][PLUGIN_KEY].is_array());
+    }
+
+    #[test]
+    fn do_install_in_skips_settings_json_when_absent() {
+        let tmp = tempfile::tempdir().expect("failed to create tempdir");
+        do_install_in(tmp.path()).unwrap();
+
+        let settings_path = tmp.path().join(".claude/settings.json");
+        assert!(!settings_path.exists());
+    }
+
+    #[test]
+    fn do_install_in_enables_plugin_in_existing_settings_json() {
+        let tmp = tempfile::tempdir().expect("failed to create tempdir");
+        let claude = tmp.path().join(".claude");
+        fs::create_dir_all(&claude).unwrap();
+        let settings_path = claude.join("settings.json");
+        fs::write(&settings_path, r#"{"enabledPlugins":{}}"#).unwrap();
+
+        do_install_in(tmp.path()).unwrap();
+
+        let content = fs::read_to_string(&settings_path).unwrap();
+        let doc: serde_json::Value = serde_json::from_str(&content).unwrap();
+        assert_eq!(doc["enabledPlugins"][PLUGIN_KEY], serde_json::json!(true));
+    }
+
+    // --- do_uninstall_in ---
+
+    #[test]
+    fn do_uninstall_in_removes_existing_cache_dir() {
         let tmp = tempfile::tempdir().expect("failed to create tempdir");
 
         // Install first
-        install_into(tmp.path()).unwrap();
-
-        let cache_dir = tmp
-            .path()
-            .join("plugins/cache/local")
-            .join(PLUGIN_NAME)
-            .join(PLUGIN_VER);
+        do_install_in(tmp.path()).unwrap();
+        let cache_dir = cache_dir_for(tmp.path());
         assert!(cache_dir.exists());
 
-        // Then uninstall
-        uninstall_from(tmp.path()).unwrap();
+        // Uninstall
+        do_uninstall_in(tmp.path()).unwrap();
         assert!(!cache_dir.exists());
     }
 
     #[test]
-    fn install_writes_correct_plugin_json_content() {
+    fn do_uninstall_in_is_noop_when_cache_absent() {
         let tmp = tempfile::tempdir().expect("failed to create tempdir");
-        install_into(tmp.path()).unwrap();
+        // No install — should succeed silently
+        do_uninstall_in(tmp.path()).unwrap();
+    }
 
-        let cache_dir = tmp
-            .path()
-            .join("plugins/cache/local")
-            .join(PLUGIN_NAME)
-            .join(PLUGIN_VER);
+    #[test]
+    fn do_uninstall_in_removes_from_plugins_json() {
+        let tmp = tempfile::tempdir().expect("failed to create tempdir");
+        let claude = tmp.path().join(".claude");
+        let plugins_dir = claude.join("plugins");
+        fs::create_dir_all(&plugins_dir).unwrap();
+        let plugins_json_path = plugins_dir.join("installed_plugins.json");
+        let initial = serde_json::json!({
+            "plugins": {
+                PLUGIN_KEY: [{"scope": "user"}]
+            }
+        });
+        fs::write(
+            &plugins_json_path,
+            serde_json::to_string_pretty(&initial).unwrap(),
+        )
+        .unwrap();
 
-        let content = fs::read_to_string(cache_dir.join(".claude-plugin/plugin.json")).unwrap();
-        // The embedded plugin.json should be valid JSON
-        let parsed: serde_json::Value = serde_json::from_str(&content).unwrap();
-        assert!(parsed.is_object());
+        do_uninstall_in(tmp.path()).unwrap();
+
+        let content = fs::read_to_string(&plugins_json_path).unwrap();
+        let doc: serde_json::Value = serde_json::from_str(&content).unwrap();
+        assert!(doc["plugins"].get(PLUGIN_KEY).is_none());
+    }
+
+    #[test]
+    fn do_uninstall_in_disables_in_settings_json() {
+        let tmp = tempfile::tempdir().expect("failed to create tempdir");
+        let claude = tmp.path().join(".claude");
+        fs::create_dir_all(&claude).unwrap();
+        let settings_path = claude.join("settings.json");
+        let initial = serde_json::json!({
+            "enabledPlugins": {
+                PLUGIN_KEY: true
+            }
+        });
+        fs::write(
+            &settings_path,
+            serde_json::to_string_pretty(&initial).unwrap(),
+        )
+        .unwrap();
+
+        do_uninstall_in(tmp.path()).unwrap();
+
+        let content = fs::read_to_string(&settings_path).unwrap();
+        let doc: serde_json::Value = serde_json::from_str(&content).unwrap();
+        assert!(doc["enabledPlugins"].get(PLUGIN_KEY).is_none());
+    }
+
+    // --- helper accessors ---
+
+    #[test]
+    fn claude_dir_from_appends_claude() {
+        let base = PathBuf::from("/tmp/test-home");
+        let dir = claude_dir_from(&base);
+        assert_eq!(dir, PathBuf::from("/tmp/test-home/.claude"));
+    }
+
+    #[test]
+    fn plugin_cache_dir_from_contains_name_and_version() {
+        let claude = PathBuf::from("/tmp/.claude");
+        let dir = plugin_cache_dir_from(&claude);
+        assert!(dir.to_string_lossy().contains(PLUGIN_NAME));
+        assert!(dir.to_string_lossy().contains(PLUGIN_VER));
     }
 
     #[test]
     fn uninstall_from_nonexistent_dir_is_noop() {
         let tmp = tempfile::tempdir().expect("failed to create tempdir");
         // Never installed — should succeed without error
-        uninstall_from(tmp.path()).unwrap();
+        do_uninstall_in(tmp.path()).unwrap();
     }
 }
