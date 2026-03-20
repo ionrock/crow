@@ -10,12 +10,7 @@ const PLUGIN_KEY: &str = "crow@local";
 // Embed all plugin files at compile time
 const PLUGIN_JSON: &str = include_str!("../../plugin/.claude-plugin/plugin.json");
 const CMD_STATUS: &str = include_str!("../../plugin/commands/status.md");
-const CMD_CHECKOUT: &str = include_str!("../../plugin/commands/checkout.md");
-const CMD_REVIEWS: &str = include_str!("../../plugin/commands/reviews.md");
-const CMD_CI: &str = include_str!("../../plugin/commands/ci.md");
-const CMD_PUSH: &str = include_str!("../../plugin/commands/push.md");
-const CMD_DONE: &str = include_str!("../../plugin/commands/done.md");
-const CMD_COMMENT: &str = include_str!("../../plugin/commands/comment.md");
+const CMD_REVIEW: &str = include_str!("../../plugin/commands/review.md");
 const SKILL_REVIEW_PR: &str = include_str!("../../plugin/skills/review-pr/SKILL.md");
 const AGENT_PR_REVIEWER: &str = include_str!("../../plugin/agents/pr-reviewer.md");
 
@@ -34,28 +29,8 @@ const PLUGIN_FILES: &[PluginFile] = &[
         content: CMD_STATUS,
     },
     PluginFile {
-        path: "commands/checkout.md",
-        content: CMD_CHECKOUT,
-    },
-    PluginFile {
-        path: "commands/reviews.md",
-        content: CMD_REVIEWS,
-    },
-    PluginFile {
-        path: "commands/ci.md",
-        content: CMD_CI,
-    },
-    PluginFile {
-        path: "commands/push.md",
-        content: CMD_PUSH,
-    },
-    PluginFile {
-        path: "commands/done.md",
-        content: CMD_DONE,
-    },
-    PluginFile {
-        path: "commands/comment.md",
-        content: CMD_COMMENT,
+        path: "commands/review.md",
+        content: CMD_REVIEW,
     },
     PluginFile {
         path: "skills/review-pr/SKILL.md",
@@ -163,7 +138,7 @@ fn do_install_in(base: &Path) -> Result<()> {
         "\n{} Restart Claude Code to load the crow plugin.",
         "Done.".bold()
     );
-    println!("Commands: /crow:status, /crow:reviews, /crow:ci, /crow:checkout, etc.");
+    println!("Commands: /crow:status, /crow:review");
 
     Ok(())
 }
@@ -232,14 +207,23 @@ mod tests {
         let cache_dir = cache_dir_for(tmp.path());
         assert!(cache_dir.join(".claude-plugin/plugin.json").exists());
         assert!(cache_dir.join("commands/status.md").exists());
-        assert!(cache_dir.join("commands/reviews.md").exists());
-        assert!(cache_dir.join("commands/ci.md").exists());
-        assert!(cache_dir.join("commands/checkout.md").exists());
-        assert!(cache_dir.join("commands/push.md").exists());
-        assert!(cache_dir.join("commands/done.md").exists());
-        assert!(cache_dir.join("commands/comment.md").exists());
+        assert!(cache_dir.join("commands/review.md").exists());
         assert!(cache_dir.join("skills/review-pr/SKILL.md").exists());
         assert!(cache_dir.join("agents/pr-reviewer.md").exists());
+    }
+
+    #[test]
+    fn do_install_in_does_not_create_deleted_command_files() {
+        let tmp = tempfile::tempdir().expect("failed to create tempdir");
+        do_install_in(tmp.path()).unwrap();
+
+        let cache_dir = cache_dir_for(tmp.path());
+        assert!(!cache_dir.join("commands/checkout.md").exists());
+        assert!(!cache_dir.join("commands/reviews.md").exists());
+        assert!(!cache_dir.join("commands/ci.md").exists());
+        assert!(!cache_dir.join("commands/push.md").exists());
+        assert!(!cache_dir.join("commands/done.md").exists());
+        assert!(!cache_dir.join("commands/comment.md").exists());
     }
 
     #[test]
