@@ -29,18 +29,7 @@ fn run(cli: Cli) -> anyhow::Result<()> {
 
     match cli.command {
         Command::Status => cmd::status::run(&gh),
-        Command::Checkout { pr } => cmd::checkout::run(&gh, &wt, pr),
-        Command::Reviews {
-            pr,
-            all,
-            diff,
-            unresolved,
-        } => cmd::reviews::run(&gh, pr, all, diff, unresolved),
-        Command::Ci { pr, watch } => cmd::ci::run(&gh, pr, watch),
-        Command::Push { reply } => cmd::push::run(&gh, reply),
-        Command::Done { ready } => cmd::done::run(&gh, &wt, ready),
         Command::Review { pr } => cmd::review::run(&gh, &wt, pr),
         Command::InstallPlugin { uninstall } => cmd::install_plugin::run(uninstall),
-        Command::Comment { pr, event, body } => cmd::comment::run(&gh, pr, event, body),
     }
 }

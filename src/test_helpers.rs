@@ -36,6 +36,7 @@ pub struct RecordedReview {
 // MockGhClient
 // ---------------------------------------------------------------------------
 
+#[allow(dead_code)]
 pub struct MockGhClient {
     pub current_pr: u64,
     pub authored: Vec<Pr>,
@@ -164,6 +165,7 @@ impl GhClient for MockGhClient {
 // MockWtClient
 // ---------------------------------------------------------------------------
 
+#[allow(dead_code)]
 pub struct MockWtClient {
     pub checked_out_pr: Cell<Option<u64>>,
     pub removed: Cell<bool>,

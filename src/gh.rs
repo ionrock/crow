@@ -125,6 +125,7 @@ const REVIEW_THREADS_QUERY: &str = r#"query($owner: String!, $repo: String!, $nu
 // GhClient trait
 // ---------------------------------------------------------------------------
 
+#[allow(dead_code)]
 pub trait GhClient {
     fn current_pr_number(&self) -> Result<u64>;
     fn pr_list_authored(&self) -> Result<Vec<Pr>>;

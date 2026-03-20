@@ -7,6 +7,7 @@ use std::process::Command;
 // Free functions (used by RealWtClient and directly by review.rs)
 // ---------------------------------------------------------------------------
 
+#[allow(dead_code)]
 fn run_wt(args: &[&str]) -> Result<()> {
     let output = Command::new("wt")
         .args(args)
@@ -25,6 +26,7 @@ fn run_wt(args: &[&str]) -> Result<()> {
 // WtClient trait
 // ---------------------------------------------------------------------------
 
+#[allow(dead_code)]
 pub trait WtClient {
     fn checkout_pr(&self, pr: u64) -> Result<()>;
     /// Check out a PR into a worktree and exec into a command, replacing the
