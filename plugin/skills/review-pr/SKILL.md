@@ -1,75 +1,106 @@
 ---
 name: review-pr
-description: Review a GitHub PR with Claude — fetches PR context, diff, CI status, and existing comments, then performs a thorough code review. Use when the user wants to review a PR, look at a PR, or analyze PR changes.
+description: Review a GitHub PR — automatically detects whether you are the author (checking feedback on your PR) or a reviewer (performing a code review). Use when the user wants to review a PR, respond to review comments, or analyze PR changes.
 argument-hint: <pr-number>
 allowed-tools: "Read, Grep, Glob, Bash, Agent"
 ---
 
-# PR Code Review
+# PR Review
 
-Review PR #$ARGUMENTS thoroughly.
+Review PR #$ARGUMENTS.
 
-## Step 1: Gather Context
+## Step 1: Detect Role
 
-Fetch all PR context in parallel:
+First, determine your role for this PR:
+
+```bash
+# Get PR details including author
+gh pr view $ARGUMENTS --json author,number,title,state
+
+# Get current git user
+git config user.email
+```
+
+If you are the **author** of the PR, follow the Author flow below.
+If you are a **reviewer**, follow the Reviewer flow below.
+
+## Author Flow: Respond to Feedback
+
+You authored this PR and want to understand reviewer feedback.
+
+### Gather feedback
+
+```bash
+# All review comments
+gh pr view $ARGUMENTS --json reviews,comments
+
+# CI status
+crow status
+```
+
+### Summarize what needs attention
+
+Group feedback by type:
+- **Must address**: Requested changes, blocking issues
+- **Should consider**: Non-blocking suggestions
+- **FYI**: Informational comments
+
+For each item, show the file/line and what the reviewer said. Be concise — one line per issue.
+
+Ask the user which items they want to address, then help them make the changes directly.
+
+## Reviewer Flow: Code Review
+
+You are reviewing someone else's PR.
+
+### Step 1: Gather context
 
 ```bash
 # PR details
 gh pr view $ARGUMENTS
 
-# PR diff
+# Full diff
 gh pr diff $ARGUMENTS
-
-# CI status
-crow ci $ARGUMENTS
-
-# Existing review comments
-crow reviews $ARGUMENTS --all
 ```
 
-## Step 2: Check Out the Code
+### Step 2: Check out the code
 
-Check out the PR into a worktree so you can read and explore the actual files:
+Check out the PR so you can read full file context:
 
 ```bash
-crow checkout $ARGUMENTS
+gh pr checkout $ARGUMENTS
 ```
 
-## Step 3: Review the Code
+### Step 3: Review
 
-Now review the PR. For each changed file in the diff:
+For each changed file:
 
-1. **Read the full file** to understand surrounding context, not just the diff
-2. **Check correctness**: logic errors, edge cases, off-by-one errors, nil/null handling
-3. **Check safety**: error handling, resource cleanup, injection risks, auth/authz
-4. **Check design**: does the abstraction make sense, is the API surface right, coupling
-5. **Check tests**: are new paths tested, are edge cases covered, do tests actually assert the right things
-6. **Check style**: naming, idiomatic patterns for this language/framework, consistency with codebase
+1. Read the full file for surrounding context
+2. Check correctness: logic errors, edge cases, null handling
+3. Check safety: error handling, resource cleanup, auth
+4. Check design: abstractions, API surface, coupling
+5. Check tests: new paths covered, edge cases, assertion quality
 
-Run tests if a test suite exists:
+Run tests if a suite exists:
 ```bash
 make test  # or cargo test, npm test, pytest, etc.
 ```
 
-## Step 4: Summarize Findings
+### Step 4: Give feedback
 
-Organize feedback by severity:
+Keep feedback simple and direct. Three levels only:
 
-**Must Fix** — Bugs, security issues, data loss risks, broken behavior
-**Should Fix** — Missing error handling, poor abstractions, test gaps
-**Consider** — Style nits, minor improvements, alternative approaches
+- **Must Fix**: Bugs, security issues, broken behavior
+- **Should Fix**: Missing error handling, test gaps
+- **Nit**: Style, naming
 
-For each finding, include:
-- The file and line number
-- What the issue is
-- A concrete suggestion for how to fix it
+For each finding: file + line, what is wrong, how to fix it. No padding. No praise unless the change is genuinely notable.
 
-## Step 5: Discuss
-
-The user may want to:
-- Discuss specific findings
-- Ask you to run additional tests or checks
-- Make fixes directly (you can edit code in the worktree)
-- Post the review via `/crow:comment`
-
-Stay in the worktree and keep helping until the user is satisfied. When done, suggest running `/crow:done` to clean up.
+Post the review when ready:
+```bash
+gh pr review $ARGUMENTS --comment --body "<your review>"
+# or to request changes:
+gh pr review $ARGUMENTS --request-changes --body "<your review>"
+# or to approve:
+gh pr review $ARGUMENTS --approve
+```
