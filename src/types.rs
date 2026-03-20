@@ -56,6 +56,7 @@ pub struct CheckRun {
     pub link: String,
 }
 
+#[allow(dead_code)]
 #[derive(Debug, Clone, Deserialize)]
 pub struct WorkflowInfo {
     pub name: String,

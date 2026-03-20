@@ -53,6 +53,7 @@ pub fn status_color(decision: &str) -> String {
     }
 }
 
+#[allow(dead_code)]
 pub fn check_icon(state: &str) -> String {
     match state {
         "SUCCESS" | "NEUTRAL" | "SKIPPED" => "✓".green().to_string(),
@@ -103,6 +104,7 @@ pub fn print_pr_row(pr: &Pr, show_author: bool) {
 // CI check row
 // ---------------------------------------------------------------------------
 
+#[allow(dead_code)]
 pub fn print_check_row(check: &CheckRun) {
     let icon = check_icon(&check.state);
     let ago = check
@@ -127,6 +129,7 @@ pub fn print_check_row(check: &CheckRun) {
 // Review thread display
 // ---------------------------------------------------------------------------
 
+#[allow(dead_code)]
 pub fn print_thread(thread: &ReviewThread, show_diff: bool) {
     let line_label = match (thread.start_line, thread.line) {
         (Some(start), Some(end)) if start != end => format!("L{}-{}", start, end),
