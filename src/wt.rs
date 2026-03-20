@@ -3,6 +3,34 @@
 use anyhow::{Context, Result};
 use std::process::Command;
 
+// ---------------------------------------------------------------------------
+// WtClient trait — injectable for testing
+// ---------------------------------------------------------------------------
+
+pub trait WtClient {
+    fn checkout_pr(&self, pr: u64) -> Result<()>;
+    fn remove_current(&self) -> Result<()>;
+}
+
+// ---------------------------------------------------------------------------
+// Real implementation
+// ---------------------------------------------------------------------------
+
+pub struct RealWtClient;
+
+impl WtClient for RealWtClient {
+    fn checkout_pr(&self, pr: u64) -> Result<()> {
+        checkout_pr(pr)
+    }
+    fn remove_current(&self) -> Result<()> {
+        remove_current()
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Free functions (used by RealWtClient and directly by review.rs)
+// ---------------------------------------------------------------------------
+
 fn run_wt(args: &[&str]) -> Result<()> {
     let output = Command::new("wt")
         .args(args)

@@ -8,6 +8,88 @@ use std::process::Command;
 use crate::types::{CheckRun, Pr, PrDetail, RepoInfo, ReviewThread, ThreadComment, ThreadComments};
 
 // ---------------------------------------------------------------------------
+// GhClient trait — injectable for testing
+// ---------------------------------------------------------------------------
+
+pub trait GhClient {
+    fn current_pr_number(&self) -> Result<u64>;
+    fn pr_list_authored(&self) -> Result<Vec<Pr>>;
+    fn pr_list_review_requested(&self) -> Result<Vec<Pr>>;
+    fn pr_checks(&self, pr: u64) -> Result<Vec<CheckRun>>;
+    fn review_threads(&self, owner: &str, repo: &str, pr: u64) -> Result<Vec<ReviewThread>>;
+    fn repo_info(&self) -> Result<RepoInfo>;
+    fn reply_to_thread(
+        &self,
+        owner: &str,
+        repo: &str,
+        pr: u64,
+        comment_id: &str,
+        body: &str,
+    ) -> Result<()>;
+    fn current_user(&self) -> Result<String>;
+    fn pr_author(&self, pr: u64) -> Result<String>;
+    fn post_review(&self, pr: u64, event: &str, body: &str) -> Result<()>;
+    fn pr_view(&self, pr: u64) -> Result<PrDetail>;
+    fn pr_diff(&self, pr: u64) -> Result<String>;
+    fn mark_ready(&self, pr: u64) -> Result<()>;
+}
+
+// ---------------------------------------------------------------------------
+// Real implementation
+// ---------------------------------------------------------------------------
+
+pub struct RealGhClient;
+
+impl GhClient for RealGhClient {
+    fn current_pr_number(&self) -> Result<u64> {
+        current_pr_number()
+    }
+    fn pr_list_authored(&self) -> Result<Vec<Pr>> {
+        pr_list_authored()
+    }
+    fn pr_list_review_requested(&self) -> Result<Vec<Pr>> {
+        pr_list_review_requested()
+    }
+    fn pr_checks(&self, pr: u64) -> Result<Vec<CheckRun>> {
+        pr_checks(pr)
+    }
+    fn review_threads(&self, owner: &str, repo: &str, pr: u64) -> Result<Vec<ReviewThread>> {
+        review_threads(owner, repo, pr)
+    }
+    fn repo_info(&self) -> Result<RepoInfo> {
+        repo_info()
+    }
+    fn reply_to_thread(
+        &self,
+        owner: &str,
+        repo: &str,
+        pr: u64,
+        comment_id: &str,
+        body: &str,
+    ) -> Result<()> {
+        reply_to_thread(owner, repo, pr, comment_id, body)
+    }
+    fn current_user(&self) -> Result<String> {
+        current_user()
+    }
+    fn pr_author(&self, pr: u64) -> Result<String> {
+        pr_author(pr)
+    }
+    fn post_review(&self, pr: u64, event: &str, body: &str) -> Result<()> {
+        post_review(pr, event, body)
+    }
+    fn pr_view(&self, pr: u64) -> Result<PrDetail> {
+        pr_view(pr)
+    }
+    fn pr_diff(&self, pr: u64) -> Result<String> {
+        pr_diff(pr)
+    }
+    fn mark_ready(&self, pr: u64) -> Result<()> {
+        mark_ready(pr)
+    }
+}
+
+// ---------------------------------------------------------------------------
 // Internal helpers
 // ---------------------------------------------------------------------------
 
