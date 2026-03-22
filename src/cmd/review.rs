@@ -207,6 +207,19 @@ pub(crate) fn build_reviewer_prompt(
          - Design: architecture, abstractions, API surface\n\
          - Safety: error handling, security, resource management\n\
          - Style: naming, clarity, idiomatic patterns for this codebase\n\n\
+         ## Review technique\n\n\
+         When the diff calls functions defined outside the changed files, read the called \
+         function's implementation to verify the caller's assumptions — return types, error \
+         behavior, side effects. Bugs often hide at these call-site boundaries.\n\n\
+         For files imported by the change, run `git log --oneline -5` on them to check for \
+         recent modifications. Recently changed dependencies are a common source of \
+         integration bugs.\n\n\
+         If CLAUDE.md or similar project convention files exist at the repo root or in the \
+         directories containing modified files, check that the changes comply with any \
+         applicable coding standards defined there.\n\n\
+         Before finalizing each finding, verify your claim by reading the relevant source \
+         code. Do not report issues based on assumptions about library or API behavior — \
+         confirm by reading the implementation.\n\n\
          CRITICAL — all feedback must be actionable, simple, and direct:\n\
          - Each issue states clearly what is wrong and exactly how to fix it.\n\
          - No vague suggestions — provide specific fixes with code snippets where helpful.\n\
@@ -781,6 +794,24 @@ mod tests {
         let prompt = build_reviewer_prompt(&detail, "", &[]);
 
         assert!(prompt.contains("must-fix"));
+    }
+
+    #[test]
+    fn reviewer_prompt_review_technique_section_present() {
+        let detail = make_detail("", vec![]);
+        let prompt = build_reviewer_prompt(&detail, "", &[]);
+
+        assert!(prompt.contains("## Review technique"));
+        // Instructs to read called function implementations
+        assert!(prompt.contains("read the called"));
+        assert!(prompt.contains("call-site boundaries"));
+        // Instructs to check git history on dependencies
+        assert!(prompt.contains("git log --oneline -5"));
+        assert!(prompt.contains("Recently changed dependencies"));
+        // Instructs to check CLAUDE.md
+        assert!(prompt.contains("CLAUDE.md"));
+        // Instructs to verify claims before reporting
+        assert!(prompt.contains("verify your claim"));
     }
 
     // -----------------------------------------------------------------------
